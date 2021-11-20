@@ -1,0 +1,18 @@
+<coordinator-app xmlns = "uri:oozie:coordinator:0.2" name =
+   "coord_cc" frequency = "${frequency}" start =
+   "2019-08-31T00:00Z" end = "2019-09-03T00:00Z" timezone="UTC" >
+   
+   <controls>
+      <timeout>1</timeout>
+      <concurrency>1</concurrency>
+      <execution>FIFO</execution>
+      <throttle>1</throttle>
+   </controls>
+   
+   <action>
+      <workflow>
+         <app-path>${wfdir}</app-path>
+      </workflow>
+   </action>
+	
+</coordinator-app>

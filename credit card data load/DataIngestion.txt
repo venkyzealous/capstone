@@ -1,0 +1,23 @@
+------One Time----
+
+#as hdfs user)
+
+hadoop fs -mkDir /input/data
+hadoop fs -chmod 777 /input/data
+
+# Executed as normal user, below sqoop commands will import rds data to hive directly using sqoop hive integration
+
+
+
+sqoop job --create import_card_member -- import --connect jdbc:mysql://upgradawsrds.cpclxrkdvwmz.us-east-1.rds.amazonaws.com/cred_financials_data --username upgraduser --P --table card_member --incremental append --check-column member_joining_dt --last-value '2010-02-02 00:00:00'   --warehouse-dir /input/data/tables --hive-import --null-string '\\N' --null-non-string '\\N'  --map-column-hive member_joining_dt=timestamp
+
+
+sqoop job --create import_member_score -- import --connect jdbc:mysql://upgradawsrds.cpclxrkdvwmz.us-east-1.rds.amazonaws.com/cred_financials_data --username upgraduser --P --table member_score --delete-target-dir --warehouse-dir /input/data/tables --hive-import --hive-overwrite --null-string '\\N' --null-non-string '\\N'
+
+--due to security reasons, password has to be entered on console for this job
+-- in production unmonitored environment, an encrypted password file and sqoop CryptoFileLoader can be used 
+
+---Scheduled
+
+sqoop job --exec import_card_member
+sqoop job --exec import_member_score

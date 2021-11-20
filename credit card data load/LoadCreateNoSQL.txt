@@ -1,0 +1,97 @@
+----Load CSV Transaction History Data
+
+--create transaction history table
+create 'card_transactions', 'card_details', 'transaction_details'
+
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS card_transactions(
+ key struct<card_id:string,transaction_dt:bigint>,
+ card_id string,
+ member_id string,
+ amount double,
+ postcode string,
+ pos_id string,
+ transaction_dt bigint,
+ status string
+)
+ROW FORMAT DELIMITED 
+COLLECTION ITEMS TERMINATED BY '~' 
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,
+card_details:card_id,card_details:member_id,transaction_details:amount,transaction_details:postcode,transaction_details:pos_id,transaction_details:transaction_dt,transaction_details:status")
+TBLPROPERTIES ("hbase.table.name" = "card_transactions", "hbase.mapred.output.outputtable" = "card_transactions");
+
+
+--Load Transactions
+
+LOAD DATA LOCAL INPATH '/home/ec2-user/capstone/card_transactions.csv' OVERWRITE INTO TABLE CARD_TRANSACTIONS_TEMP;
+
+INSERT INTO card_transactions
+SELECT NAMED_STRUCT('card_id',card_id,'transaction_dt',unix_timestamp(transaction_dt, "DD-MM-YYYY HH:mm:ss")), card_id, member_id,amount,postcode,pos_id,unix_timestamp(transaction_dt, "DD-MM-YYYY HH:mm:ss"),status FROM CARD_TRANSACTIONS_TEMP;
+
+
+
+
+
+
+--Create Lookup Tables
+
+
+
+create 'lookup_card_member', 'card_details', 'last_transaction_details', 'member_details'
+
+
+CREATE EXTERNAL IF NOT EXISTS TABLE LOOKUP_CARD_MEMBER(
+ card_id string,
+ ucl double,
+ postcode string,
+ transaction_dt bigint,
+ score int,
+ member_id string,
+ member_joining_dt string,
+ card_purchase_dt string,
+ country string,
+ city string
+)
+ROW FORMAT DELIMITED 
+COLLECTION ITEMS TERMINATED BY '~' 
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,last_transaction_details:ucl,last_transaction_details:postcode,last_transaction_details:transaction_dt,last_transaction_details:score,member_details:member_id,member_details:member_joining_dt,card_details:card_purchase_dt,member_details:country,member_details:city")
+TBLPROPERTIES ("hbase.table.name" = "lookup_card_member", "hbase.mapred.output.outputtable" = "lookup_card_member");
+
+
+
+create 'lookup_txn_master', 'card_details', 'transaction_details'
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS LOOKUP_TXN_MASTER(
+ key struct<card_id:string,transaction_dt:bigint>,
+ card_id string,
+ member_id string,
+ amount double,
+ postcode string,
+ pos_id string,
+ transaction_dt bigint,
+ status string,
+ txrank int
+)
+ROW FORMAT DELIMITED 
+COLLECTION ITEMS TERMINATED BY '~' 
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,
+card_details:card_id,card_details:member_id,transaction_details:amount,transaction_details:postcode,transaction_details:pos_id,transaction_details:transaction_dt,transaction_details:status,transaction_details:txrank")
+TBLPROPERTIES ("hbase.table.name" = "lookup_txn_master", "hbase.mapred.output.outputtable" = "lookup_txn_master");
+
+
+--Loading top 10 genuine transactions
+INSERT INTO LOOKUP_TXN_MASTER
+SELECT * FROM (
+    SELECT  *, RANK() OVER(PARTITION BY card_id ORDER BY transaction_dt DESC) txrank
+     FROM(
+        SELECT *
+        FROM card_transactions
+        WHERE status = "GENUINE"
+    ) genuine_transactions
+) ranked_transactions 
+WHERE txrank <= 10;

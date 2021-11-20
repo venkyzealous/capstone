@@ -1,0 +1,82 @@
+<workflow-app xmlns = "uri:oozie:workflow:0.4" name = "CC-Workflow">
+   <start to = "ImportCardMember" />
+   
+   <action name="ImportCardMember">
+		<sqoop xmlns="uri:oozie:sqoop-action:0.2">
+			<job-tracker>${jobTracker}</job-tracker>
+			<name-node>${nameNode}</name-node>
+<arg>import</arg> 
+<arg>--connect</arg> 
+<arg>jdbc:mysql://upgradawsrds.cpclxrkdvwmz.us-east-1.rds.amazonaws.com/cred_financials_data</arg> 
+<arg>--username</arg> 
+<arg>upgraduser</arg>  
+<arg>--password</arg>  
+<arg>upgraduser</arg>  
+<arg>--table</arg>  
+<arg>card_member</arg>  
+<arg>--incremental</arg>  
+<arg>append</arg>  
+<arg>--check-column</arg>  
+<arg>member_joining_dt</arg>  
+<arg>--last-value</arg>  
+<arg>'2010-02-02 00:00:00'</arg> 
+<arg>--warehouse-dir</arg>  
+<arg>/input/data/tables</arg>  
+<arg>--hive-import</arg>  
+<arg>--map-column-hive</arg> 
+<arg>member_joining_dt=timestamp</arg>
+
+		</sqoop>
+		<ok to="truncate"/>
+		<error to="end"/>
+   </action>
+
+<action name="truncate">
+	<shell xmlns="uri:oozie:shell-action:0.2">
+	<job-tracker>${jobTracker}</job-tracker>
+	<name-node>${nameNode}</name-node>
+	<exec>common.sh</exec>
+	<file>${batch_name}#common.sh</file>
+	<capture-output/>
+	</shell>
+		<ok to="ImportMemberScore"/>
+		<error to="end"/>
+</action>
+
+  
+   <action name="ImportMemberScore">
+		<sqoop xmlns="uri:oozie:sqoop-action:0.2">
+			<job-tracker>${jobTracker}</job-tracker>
+			<name-node>${nameNode}</name-node>
+<arg>import</arg> 
+<arg>--connect</arg>  
+<arg>jdbc:mysql://upgradawsrds.cpclxrkdvwmz.us-east-1.rds.amazonaws.com/cred_financials_data</arg> 
+<arg>--username</arg>  
+<arg>upgraduser</arg>   
+<arg>--password</arg>  
+<arg>upgraduser</arg>  
+<arg>--table</arg>
+<arg>member_score</arg>
+<arg>--delete-target-dir</arg>  
+<arg>--warehouse-dir</arg>  
+<arg>/input/data/tables</arg> 
+<arg>--hive-import</arg>  
+<arg>--hive-overwrite</arg>
+</sqoop>
+   
+		<ok to="LoadData"/>
+		<error to="end"/>
+   </action>
+   
+    <action name="LoadData">
+		 <hive xmlns = "uri:oozie:hive-action:0.4">
+			<job-tracker>${jobTracker}</job-tracker>
+			<name-node>${nameNode}</name-node>
+			<script>${script_name}</script>
+      </hive>
+	
+		<ok to="end"/>
+		<error to="end"/>
+   </action>
+   <end name = "end" />
+</workflow-app>
